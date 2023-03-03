@@ -12,7 +12,7 @@ enum {
 
 void DrawWindow();
 
-void HandleKey(int key);
+void HandleKey(const int key);
 
 void OnFinish();
 

@@ -1,4 +1,5 @@
 #include <dirent.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -6,6 +7,11 @@ typedef struct direct {
     int size;
     struct dirent *dirs;
 } direct;
+
+enum {
+    NO_SUCH_FILE = 0,
+    HAS_SUCH_FILE = 1,
+};
 
 enum {
     ERR_NO_DIR_GIVEN = -1,
@@ -27,7 +33,7 @@ void pop_path(char *path) {
 }
 
 /* adds next_dir to path */
-void concat_path(char *path, char *next_dir) {
+void concat_path(char *path, const char *next_dir) {
     char delimetr[] = "/";
     strncat(path, delimetr, 1);
     strncat(path, next_dir, PATH_MAX - strlen(path));
@@ -40,7 +46,7 @@ int cmpstruct(const void *a, const void *b) {
 }
 
 /* Returns an array of directory elements sorted by name */
-int get_dir_content(const char *path, direct *cur_dir) {
+int get_dir_content(const char *path, direct *cur_dir, const bool show_hid) {
     if (cur_dir == NULL) {
         return ERR_NO_DIR_GIVEN;
     }
@@ -56,7 +62,13 @@ int get_dir_content(const char *path, direct *cur_dir) {
         if (strcmp(dir->d_name, ".") == 0) {
             continue;
         }
-        ++cur_dir->size;
+        if (strcmp(dir->d_name, "..") == 0) {
+            ++cur_dir->size;
+            continue;
+        }
+        if (dir->d_name[0] != '.' || show_hid) {
+            ++cur_dir->size;
+        }
     }
 
     cur_dir->dirs = calloc(cur_dir->size, sizeof(*cur_dir->dirs));
@@ -71,8 +83,15 @@ int get_dir_content(const char *path, direct *cur_dir) {
         if (strcmp(dir->d_name, ".") == 0) {
             continue;
         }
-        cur_dir->dirs[i] = *dir;
-        ++i;
+        if (strcmp(dir->d_name, "..") == 0) {
+            cur_dir->dirs[i] = *dir;
+            ++i;
+            continue;
+        }
+        if (dir->d_name[0] != '.' || show_hid) {
+            cur_dir->dirs[i] = *dir;
+            ++i;
+        }
     }
 
     closedir(directory);
@@ -80,4 +99,19 @@ int get_dir_content(const char *path, direct *cur_dir) {
     qsort(cur_dir->dirs, cur_dir->size, sizeof(struct dirent), cmpstruct);
 
     return 0;
+}
+
+int has_such_file(const char *path, const char *name) {
+    DIR *directory = opendir(path);
+    if (directory == NULL) {
+        return ERR_NO_DIR;
+    }
+
+    struct dirent *dir;
+    while ((dir = readdir(directory))) {
+        if (strcmp(dir->d_name, name) == 0) {
+            return HAS_SUCH_FILE;
+        }
+    }
+    return NO_SUCH_FILE;
 }
